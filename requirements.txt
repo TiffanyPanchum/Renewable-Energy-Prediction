@@ -1,0 +1,13 @@
+pandas
+numpy
+scikit-learn
+xgboost
+tensorflow-cpu
+torch
+transformers
+matplotlib
+seaborn
+streamlit
+fastapi
+flask 
+gunicorn
