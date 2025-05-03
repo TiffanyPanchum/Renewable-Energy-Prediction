@@ -12,3 +12,4 @@ fastapi
 flask 
 gunicorn
 meteostat
+seaborn
