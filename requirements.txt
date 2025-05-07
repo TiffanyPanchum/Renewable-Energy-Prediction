@@ -12,3 +12,8 @@ fastapi
 flask 
 gunicorn
 meteostat
+
+keras
+joblib
+tensorflow
+requests
