@@ -9,12 +9,8 @@ from prophet.serialize import model_from_json
 start = time.time()
 
 # --- Page Config ---
-st.set_page_config(
-    page_title="Renewable Energy Dashboard",
-    page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Renewable Energy Dashboard", page_icon="⚡", layout="wide",
+                   initial_sidebar_state="expanded")
 
 # --- Custom CSS ---
 st.markdown("""
@@ -105,36 +101,19 @@ st.markdown("""
 
 # --- Sidebar Filters ---
 st.sidebar.header("Filters")
-countries = st.sidebar.multiselect(
-    "Select Countries",
-    options=df['Country'].unique(),
-    default=df['Country'].unique()
-)
+countries = st.sidebar.multiselect("Select Countries", options=df['Country'].unique(), default=df['Country'].unique())
 
-year_range = st.sidebar.slider(
-    "Select Year Range",
-    min_value=int(df['time'].dt.year.min()),
-    max_value=int(df['time'].dt.year.max()),
-    value=(int(df['time'].dt.year.min()), int(df['time'].dt.year.max()))
-)
+year_range = st.sidebar.slider("Select Year Range", min_value=int(df['time'].dt.year.min()),
+                               max_value=int(df['time'].dt.year.max()),
+                               value=(int(df['time'].dt.year.min()), int(df['time'].dt.year.max())))
 
-energy_types = st.sidebar.multiselect(
-    "Energy Types",
-    options=['Solar', 'Wind Onshore'],
-    default=['Solar', 'Wind Onshore']
-)
+energy_types = st.sidebar.multiselect("Energy Types", options=['Solar', 'Wind Onshore'],
+                                      default=['Solar', 'Wind Onshore'])
 
-forecast_period = st.sidebar.selectbox(
-    "Forecast Period",
-    options=['24 hours', '1 week', '1 month'],
-    index=0
-)
+forecast_period = st.sidebar.selectbox("Forecast Period", options=['24 hours', '1 week', '1 month'], index=0)
 
 # Apply filters
-filtered_df = df[
-    (df['Country'].isin(countries)) &
-    (df['time'].dt.year.between(year_range[0], year_range[1]))
-    ]
+filtered_df = df[(df['Country'].isin(countries)) & (df['time'].dt.year.between(year_range[0], year_range[1]))]
 
 # --- Key Metrics ---
 st.subheader("Regional Energy Overview")
@@ -184,48 +163,28 @@ with tab1:
     # Melt the dataframe to have energy types as a variable
     country_energy = filtered_df.groupby(['Country', filtered_df['time'].dt.year])[
         ['Solar', 'Wind Onshore']].sum().reset_index()
-    melted_df = country_energy.melt(
-        id_vars=['Country', 'time'],
-        value_vars=['Solar', 'Wind Onshore'],
-        var_name='Energy Type',
-        value_name='Production'
-    )
+    melted_df = country_energy.melt(id_vars=['Country', 'time'], value_vars=['Solar', 'Wind Onshore'],
+                                    var_name='Energy Type', value_name='Production')
 
     # Create the plot
-    fig = px.line(
-        melted_df,
-        x='time',
-        y='Production',
-        color='Country',
-        line_dash='Energy Type',
-        title='Annual Energy Production by Country and Type',
-        labels={'time': 'Year', 'Production': 'Energy Production'},
-        color_discrete_sequence=px.colors.qualitative.Plotly
-    )
+    fig = px.line(melted_df, x='time', y='Production', color='Country', line_dash='Energy Type',
+                  title='Annual Energy Production by Country and Type',
+                  labels={'time': 'Year', 'Production': 'Energy Production'},
+                  color_discrete_sequence=px.colors.qualitative.Plotly)
 
     # Customize the legend and lines
-    fig.update_layout(
-        legend_title_text='Country',
-        legend_itemsizing='constant',  # Makes legend items same size
-        hovermode='x unified'
-    )
+    fig.update_layout(legend_title_text='Country', legend_itemsizing='constant',  # Makes legend items same size
+                      hovermode='x unified')
 
     # Explicitly set line styles for each energy type
-    fig.update_traces(
-        line=dict(width=3),
-        selector=dict(line_dash='solid')  # Default for Solar
-    )
-    fig.update_traces(
-        line=dict(width=3, dash='dot'),
-        selector=dict(line_dash='dot')  # For Wind Onshore
-    )
+    fig.update_traces(line=dict(width=3), selector=dict(line_dash='solid')  # Default for Solar
+                      )
+    fig.update_traces(line=dict(width=3, dash='dot'), selector=dict(line_dash='dot')  # For Wind Onshore
+                      )
 
     # Improve hover template
     fig.update_traces(
-        hovertemplate='<b>%{fullData.name}</b><br>' +
-                      'Year: %{x}<br>' +
-                      'Production: %{y:,} units<extra></extra>'
-    )
+        hovertemplate='<b>%{fullData.name}</b><br>' + 'Year: %{x}<br>' + 'Production: %{y:,} units<extra></extra>')
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -237,109 +196,62 @@ with tab2:
 
     # Melt the data to combine energy types
     season_energy = filtered_df.groupby(['Country', 'season_name'])[['Solar', 'Wind Onshore']].mean().reset_index()
-    melted_df = season_energy.melt(
-        id_vars=['Country', 'season_name'],
-        value_vars=['Solar', 'Wind Onshore'],
-        var_name='Energy Type',
-        value_name='Production'
-    )
+    melted_df = season_energy.melt(id_vars=['Country', 'season_name'], value_vars=['Solar', 'Wind Onshore'],
+                                   var_name='Energy Type', value_name='Production')
 
     # Create ordered category for seasons
-    melted_df['season_name'] = pd.Categorical(
-        melted_df['season_name'],
-        categories=season_order,
-        ordered=True
-    )
+    melted_df['season_name'] = pd.Categorical(melted_df['season_name'], categories=season_order, ordered=True)
 
     # Create stacked bar chart with seasons as x-axis
-    fig = px.bar(
-        melted_df,
-        x='season_name',  # Seasons on x-axis
-        y='Production',
-        color='Energy Type',
-        facet_col='Country',  # Separate subplots per country
-        title='Average Seasonal Production Composition',
-        category_orders={"season_name": season_order},
-        color_discrete_map={
-            'Solar': '#FFA500',  # Orange for solar
-            'Wind Onshore': '#4682B4'  # Steel blue for wind
-        }
-    )
+    fig = px.bar(melted_df, x='season_name',  # Seasons on x-axis
+                 y='Production', color='Energy Type', facet_col='Country',  # Separate subplots per country
+                 title='Average Seasonal Production Composition', category_orders={"season_name": season_order},
+                 color_discrete_map={'Solar': '#FFA500',  # Orange for solar
+                                     'Wind Onshore': '#4682B4'  # Steel blue for wind
+                                     })
 
     # Improve layout
-    fig.update_layout(
-        barmode='stack',
-        hovermode='x unified',
-        yaxis_title='Average Production (units)',
-        showlegend=True,
-        xaxis_title='',  # Remove x-axis title
-        xaxis2_title='',  # Remove x-axis title for subplots
-        xaxis3_title=''  # Remove x-axis title for subplots
-    )
+    fig.update_layout(barmode='stack', hovermode='x unified', yaxis_title='Average Production (units)', showlegend=True,
+                      xaxis_title='',  # Remove x-axis title
+                      xaxis2_title='',  # Remove x-axis title for subplots
+                      xaxis3_title=''  # Remove x-axis title for subplots
+                      )
 
     # Remove the "Country=" prefix from facet titles
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
 
     # Customize hover template
     fig.update_traces(
-        hovertemplate='<b>%{fullData.name}</b><br>' +
-                      'Season: %{x}<br>' +
-                      'Production: %{y:.2f} units<extra></extra>'
-    )
+        hovertemplate='<b>%{fullData.name}</b><br>' + 'Season: %{x}<br>' + 'Production: %{y:.2f} units<extra></extra>')
 
     st.plotly_chart(fig, use_container_width=True)
 
 with tab3:
     # Melt the dataframe to have energy types as a variable
     hourly_energy = filtered_df.groupby(['Country', 'hour'])[['Solar', 'Wind Onshore']].mean().reset_index()
-    melted_df = hourly_energy.melt(
-        id_vars=['Country', 'hour'],
-        value_vars=['Solar', 'Wind Onshore'],
-        var_name='Energy Type',
-        value_name='Production'
-    )
+    melted_df = hourly_energy.melt(id_vars=['Country', 'hour'], value_vars=['Solar', 'Wind Onshore'],
+                                   var_name='Energy Type', value_name='Production')
 
     # Create the plot
-    fig = px.line(
-        melted_df,
-        x='hour',
-        y='Production',
-        color='Country',
-        line_dash='Energy Type',
-        title='Average Daily Production Pattern',
-        labels={'hour': 'Hour of Day', 'Production': 'Average Production'},
-        color_discrete_sequence=px.colors.qualitative.Plotly
-    )
+    fig = px.line(melted_df, x='hour', y='Production', color='Country', line_dash='Energy Type',
+                  title='Average Daily Production Pattern',
+                  labels={'hour': 'Hour of Day', 'Production': 'Average Production'},
+                  color_discrete_sequence=px.colors.qualitative.Plotly)
 
     # Customize the legend and lines
-    fig.update_layout(
-        legend_title_text='Country',
-        legend_itemsizing='constant',
-        hovermode='x unified',
-        xaxis=dict(
-            tickmode='linear',
-            dtick=1,
-            range=[0, 23]
-        ),
-        yaxis_title='Average Energy Production (units)'
-    )
+    fig.update_layout(legend_title_text='Country', legend_itemsizing='constant', hovermode='x unified',
+                      xaxis=dict(tickmode='linear', dtick=1, range=[0, 23]),
+                      yaxis_title='Average Energy Production (units)')
 
     # Explicitly set line styles
-    fig.update_traces(
-        line=dict(width=3),
-        selector=dict(line_dash='solid')  # Solar gets solid lines
-    )
-    fig.update_traces(
-        line=dict(width=3, dash='dot'),
-        selector=dict(line_dash='dot')  # Wind gets dotted lines
-    )
+    fig.update_traces(line=dict(width=3), selector=dict(line_dash='solid')  # Solar gets solid lines
+                      )
+    fig.update_traces(line=dict(width=3, dash='dot'), selector=dict(line_dash='dot')  # Wind gets dotted lines
+                      )
 
     # Improve hover template
     fig.update_traces(
-        hovertemplate='<b>%{fullData.name}</b><br>' +
-                     'Hour: %{x}:00<br>' +
-                     'Production: %{y:.2f} units<extra></extra>'
-    )
+        hovertemplate='<b>%{fullData.name}</b><br>' + 'Hour: %{x}:00<br>' + 'Production: %{y:.2f} units<extra></extra>')
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -361,11 +273,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
 
         # Make future dataframe
         last_date = filtered_df['time'].max()
-        future = pd.DataFrame({'ds': pd.date_range(
-            start=last_date,
-            periods=periods + 1,
-            freq=freq
-        )})
+        future = pd.DataFrame({'ds': pd.date_range(start=last_date, periods=periods + 1, freq=freq)})
 
         # Add required regressors with default values (0)
         if 'Solar' in energy_types:
@@ -405,37 +313,24 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
 
                 # Show forecast plot with improved visualization
                 st.write("#### Forecast Visualization")
-                fig_solar_forecast = px.line(
-                    solar_forecast,
-                    x='ds',
-                    y='yhat',
-                    title='Solar Energy Forecast',
-                    labels={'ds': 'Date', 'yhat': 'Solar Production (units)'}
-                )
+                fig_solar_forecast = px.line(solar_forecast, x='ds', y='yhat', title='Solar Energy Forecast',
+                                             labels={'ds': 'Date', 'yhat': 'Solar Production (units)'})
 
                 # Add uncertainty range as a shaded area
-                fig_solar_forecast.add_trace(go.Scatter(
-                    x=pd.concat([solar_forecast['ds'], solar_forecast['ds'][::-1]]),
-                    y=pd.concat([solar_forecast['yhat_upper'], solar_forecast['yhat_lower'][::-1]]),
-                    fill='toself',
-                    fillcolor='rgba(255,165,0,0.2)',
-                    line=dict(color='rgba(255,255,255,0)'),
-                    name='Uncertainty Range'
-                ))
+                fig_solar_forecast.add_trace(go.Scatter(x=pd.concat([solar_forecast['ds'], solar_forecast['ds'][::-1]]),
+                                                        y=pd.concat([solar_forecast['yhat_upper'],
+                                                                     solar_forecast['yhat_lower'][::-1]]),
+                                                        fill='toself',
+                                                        fillcolor='rgba(255,165,0,0.2)',
+                                                        line=dict(color='rgba(255,255,255,0)'),
+                                                        name='Uncertainty Range'))
 
                 # Customize layout
-                fig_solar_forecast.update_layout(
-                    hovermode='x unified',
-                    showlegend=True,
-                    xaxis_title='Date',
-                    yaxis_title='Solar Production (units)',
-                    yaxis=dict(rangemode='tozero')
-                )
+                fig_solar_forecast.update_layout(hovermode='x unified', showlegend=True, xaxis_title='Date',
+                                                 yaxis_title='Solar Production (units)', yaxis=dict(rangemode='tozero'))
 
                 # Add range slider for better navigation
-                fig_solar_forecast.update_xaxes(
-                    rangeslider_visible=True
-                )
+                fig_solar_forecast.update_xaxes(rangeslider_visible=True)
 
                 st.plotly_chart(fig_solar_forecast, use_container_width=True)
 
@@ -477,38 +372,26 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
 
                 # Show forecast plot with improved visualization
                 st.write("#### Forecast Visualization")
-                fig_wind_forecast = px.line(
-                    wind_forecast,
-                    x='ds',
-                    y='yhat',
-                    title='Wind Energy Forecast',
-                    labels={'ds': 'Date', 'yhat': 'Wind Production (units)'},
-                    color_discrete_sequence=['#4682B4']  # Steel blue color
-                )
+                fig_wind_forecast = px.line(wind_forecast, x='ds', y='yhat', title='Wind Energy Forecast',
+                                            labels={'ds': 'Date', 'yhat': 'Wind Production (units)'},
+                                            color_discrete_sequence=['#4682B4']
+                                            # Steel blue color
+                                            )
 
                 # Add uncertainty range as a shaded area
-                fig_wind_forecast.add_trace(go.Scatter(
-                    x=pd.concat([wind_forecast['ds'], wind_forecast['ds'][::-1]]),
-                    y=pd.concat([wind_forecast['yhat_upper'], wind_forecast['yhat_lower'][::-1]]),
-                    fill='toself',
-                    fillcolor='rgba(70,130,180,0.2)',
-                    line=dict(color='rgba(255,255,255,0)'),
-                    name='Uncertainty Range'
-                ))
+                fig_wind_forecast.add_trace(go.Scatter(x=pd.concat([wind_forecast['ds'], wind_forecast['ds'][::-1]]),
+                                                       y=pd.concat([wind_forecast['yhat_upper'],
+                                                                    wind_forecast['yhat_lower'][::-1]]), fill='toself',
+                                                       fillcolor='rgba(70,130,180,0.2)',
+                                                       line=dict(color='rgba(255,255,255,0)'),
+                                                       name='Uncertainty Range'))
 
                 # Customize layout
-                fig_wind_forecast.update_layout(
-                    hovermode='x unified',
-                    showlegend=True,
-                    xaxis_title='Date',
-                    yaxis_title='Wind Production (units)',
-                    yaxis=dict(rangemode='tozero')
-                )
+                fig_wind_forecast.update_layout(hovermode='x unified', showlegend=True, xaxis_title='Date',
+                                                yaxis_title='Wind Production (units)', yaxis=dict(rangemode='tozero'))
 
                 # Add range slider for better navigation
-                fig_wind_forecast.update_xaxes(
-                    rangeslider_visible=True
-                )
+                fig_wind_forecast.update_xaxes(rangeslider_visible=True)
 
                 st.plotly_chart(fig_wind_forecast, use_container_width=True)
 
@@ -533,12 +416,8 @@ if st.button("Generate Custom Report"):
     report_cols = ['time', 'Country', 'Solar', 'Wind Onshore', 'temp', 'rhum', 'prcp', 'wspd', 'pres']
     report_df = filtered_df[report_cols].copy()
     csv = report_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="Download Current View as CSV",
-        data=csv,
-        file_name='renewable_energy_report.csv',
-        mime='text/csv'
-    )
+    st.download_button(label="Download Current View as CSV", data=csv, file_name='renewable_energy_report.csv',
+                       mime='text/csv')
 
 # --- Footer ---
 st.markdown("---")
