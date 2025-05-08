@@ -17,3 +17,7 @@ keras
 joblib
 tensorflow
 requests
+plotly
+pillow
+altair
+prophet
