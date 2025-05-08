@@ -1,9 +1,9 @@
 import time
-import json
+
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
-from prophet import Prophet
 from prophet.serialize import model_from_json
 
 start = time.time()
@@ -96,7 +96,7 @@ solar_model, wind_model, solar_regressors, wind_regressors = load_prophet_models
 # --- Header ---
 st.markdown("""
 <div class="header">
-    <h1 style="color:#2c3e50;">⚡ Renewable Energy Dashboard</h1>
+    <h1 style="color:#2c3e50;">Renewable Energy Dashboard</h1>
     <p style="color:#34495e;">
         Track and forecast solar and wind energy production across France, Italy, and Spain
     </p>
@@ -137,7 +137,7 @@ filtered_df = df[
     ]
 
 # --- Key Metrics ---
-st.subheader("🌍 Regional Energy Overview")
+st.subheader("Regional Energy Overview")
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -177,7 +177,7 @@ with col4:
     """, unsafe_allow_html=True)
 
 # --- Country Comparison ---
-st.subheader("🏁 Country Comparison")
+st.subheader("Country Comparison")
 tab1, tab2, tab3 = st.tabs(["Production Trends", "Seasonal Patterns", "Hourly Patterns"])
 
 with tab1:
@@ -344,7 +344,7 @@ with tab3:
     st.plotly_chart(fig, use_container_width=True)
 
 # --- Prophet Forecasting ---
-st.subheader("🔮 Energy Production Forecast")
+st.subheader("Energy Production Forecast")
 
 if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
     with st.spinner('Preparing forecast...'):
@@ -382,6 +382,11 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
             try:
                 solar_forecast = solar_model.predict(future)
 
+                # Apply non-negative constraint
+                solar_forecast['yhat'] = solar_forecast['yhat'].clip(lower=0)
+                solar_forecast['yhat_lower'] = solar_forecast['yhat_lower'].clip(lower=0)
+                solar_forecast['yhat_upper'] = solar_forecast['yhat_upper'].clip(lower=0)
+
                 # Show forecast components
                 st.write("#### Forecast Components")
                 fig_solar_components = solar_model.plot_components(solar_forecast)
@@ -392,27 +397,60 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                 ax.set_xlabel("Date")
                 ax.set_ylabel("Solar Production (units)")
 
-                # Remove the fifth plot if it exists
+                # Remove the fifth plot
                 if len(fig_solar_components.axes) >= 5:
                     fig_solar_components.delaxes(fig_solar_components.axes[4])
 
                 st.pyplot(fig_solar_components)
 
-                # Show forecast plot
+                # Show forecast plot with improved visualization
                 st.write("#### Forecast Visualization")
-                fig_solar_forecast = solar_model.plot(solar_forecast)
-                st.pyplot(fig_solar_forecast)
+                fig_solar_forecast = px.line(
+                    solar_forecast,
+                    x='ds',
+                    y='yhat',
+                    title='Solar Energy Forecast',
+                    labels={'ds': 'Date', 'yhat': 'Solar Production (units)'}
+                )
+
+                # Add uncertainty range as a shaded area
+                fig_solar_forecast.add_trace(go.Scatter(
+                    x=pd.concat([solar_forecast['ds'], solar_forecast['ds'][::-1]]),
+                    y=pd.concat([solar_forecast['yhat_upper'], solar_forecast['yhat_lower'][::-1]]),
+                    fill='toself',
+                    fillcolor='rgba(255,165,0,0.2)',
+                    line=dict(color='rgba(255,255,255,0)'),
+                    name='Uncertainty Range'
+                ))
+
+                # Customize layout
+                fig_solar_forecast.update_layout(
+                    hovermode='x unified',
+                    showlegend=True,
+                    xaxis_title='Date',
+                    yaxis_title='Solar Production (units)',
+                    yaxis=dict(rangemode='tozero')
+                )
+
+                # Add range slider for better navigation
+                fig_solar_forecast.update_xaxes(
+                    rangeslider_visible=True
+                )
+
+                st.plotly_chart(fig_solar_forecast, use_container_width=True)
 
                 # Show latest prediction
                 last_solar_pred = solar_forecast.iloc[-1]
                 st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-title">Predicted Solar Output</div>
-                    <div class="metric-value">{last_solar_pred['yhat']:.2f} units</div>
-                    <div>at {last_solar_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
-                    <div class="metric-title">Uncertainty Range: {last_solar_pred['yhat_lower']:.2f} to {last_solar_pred['yhat_upper']:.2f}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    <div class="metric-card">
+                        <div class="metric-title">Solar Output Range</div>
+                        <div class="metric-value">
+                            {last_solar_pred['yhat_lower']:.0f} - {last_solar_pred['yhat_upper']:.0f} units
+                        </div>
+                        <div>at {last_solar_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
+                        <div class="metric-title">(95% confidence interval)</div>
+                    </div>
+                    """, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Error in solar forecast: {str(e)}")
 
@@ -422,31 +460,75 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
             try:
                 wind_forecast = wind_model.predict(future)
 
+                # Apply non-negative constraint
+                wind_forecast['yhat'] = wind_forecast['yhat'].clip(lower=0)
+                wind_forecast['yhat_lower'] = wind_forecast['yhat_lower'].clip(lower=0)
+                wind_forecast['yhat_upper'] = wind_forecast['yhat_upper'].clip(lower=0)
+
                 # Show forecast components
                 st.write("#### Forecast Components")
                 fig_wind_components = wind_model.plot_components(wind_forecast)
+
+                # Remove the fifth plot
+                if len(fig_wind_components.axes) >= 5:
+                    fig_wind_components.delaxes(fig_wind_components.axes[4])
+
                 st.pyplot(fig_wind_components)
 
-                # Show forecast plot
+                # Show forecast plot with improved visualization
                 st.write("#### Forecast Visualization")
-                fig_wind_forecast = wind_model.plot(wind_forecast)
-                st.pyplot(fig_wind_forecast)
+                fig_wind_forecast = px.line(
+                    wind_forecast,
+                    x='ds',
+                    y='yhat',
+                    title='Wind Energy Forecast',
+                    labels={'ds': 'Date', 'yhat': 'Wind Production (units)'},
+                    color_discrete_sequence=['#4682B4']  # Steel blue color
+                )
+
+                # Add uncertainty range as a shaded area
+                fig_wind_forecast.add_trace(go.Scatter(
+                    x=pd.concat([wind_forecast['ds'], wind_forecast['ds'][::-1]]),
+                    y=pd.concat([wind_forecast['yhat_upper'], wind_forecast['yhat_lower'][::-1]]),
+                    fill='toself',
+                    fillcolor='rgba(70,130,180,0.2)',
+                    line=dict(color='rgba(255,255,255,0)'),
+                    name='Uncertainty Range'
+                ))
+
+                # Customize layout
+                fig_wind_forecast.update_layout(
+                    hovermode='x unified',
+                    showlegend=True,
+                    xaxis_title='Date',
+                    yaxis_title='Wind Production (units)',
+                    yaxis=dict(rangemode='tozero')
+                )
+
+                # Add range slider for better navigation
+                fig_wind_forecast.update_xaxes(
+                    rangeslider_visible=True
+                )
+
+                st.plotly_chart(fig_wind_forecast, use_container_width=True)
 
                 # Show latest prediction
                 last_wind_pred = wind_forecast.iloc[-1]
                 st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-title">Predicted Wind Output</div>
-                    <div class="metric-value">{last_wind_pred['yhat']:.2f} units</div>
-                    <div>at {last_wind_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
-                    <div class="metric-title">Uncertainty Range: {last_wind_pred['yhat_lower']:.2f} to {last_wind_pred['yhat_upper']:.2f}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    <div class="metric-card">
+                        <div class="metric-title">Wind Output Range</div>
+                        <div class="metric-value">
+                            {last_wind_pred['yhat_lower']:.0f} - {last_wind_pred['yhat_upper']:.0f} units
+                        </div>
+                        <div>at {last_wind_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
+                        <div class="metric-title">(95% confidence interval)</div>
+                    </div>
+                    """, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Error in wind forecast: {str(e)}")
 
 # --- Data Export ---
-st.subheader("📊 Data Export")
+st.subheader("Data Export")
 if st.button("Generate Custom Report"):
     report_cols = ['time', 'Country', 'Solar', 'Wind Onshore', 'temp', 'rhum', 'prcp', 'wspd', 'pres']
     report_df = filtered_df[report_cols].copy()
