@@ -118,14 +118,14 @@ filtered_df = df[(df['Country'].isin(countries)) & (df['time'].dt.year.between(y
 
 # --- Key Metrics ---
 st.subheader("Regional Energy Overview")
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     total_solar = filtered_df['Solar'].sum()
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-title">Total Solar Production</div>
-        <div class="metric-value">{total_solar:,.0f} units</div>
+        <div class="metric-value">{total_solar:,.0f} MW</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -134,7 +134,7 @@ with col2:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-title">Total Wind Production</div>
-        <div class="metric-value">{total_wind:,.0f} units</div>
+        <div class="metric-value">{total_wind:,.0f} MW</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -152,7 +152,16 @@ with col4:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-title">Peak Solar Output</div>
-        <div class="metric-value">{peak_solar:,.0f} units</div>
+        <div class="metric-value">{peak_solar:,.0f} MW</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col5:
+    peak_wind = filtered_df['Wind Onshore'].max()
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Peak Wind Output</div>
+        <div class="metric-value">{peak_wind:,.0f} MW</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -185,7 +194,7 @@ with tab1:
 
     # Improve hover template
     fig.update_traces(
-        hovertemplate='<b>%{fullData.name}</b><br>' + 'Year: %{x}<br>' + 'Production: %{y:,} units<extra></extra>')
+        hovertemplate='<b>%{fullData.name}</b><br>' + 'Year: %{x}<br>' + 'Production: %{y:,} MW<extra></extra>')
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -212,7 +221,7 @@ with tab2:
                                      })
 
     # Improve layout
-    fig.update_layout(barmode='stack', hovermode='x unified', yaxis_title='Average Production (units)', showlegend=True,
+    fig.update_layout(barmode='stack', hovermode='x unified', yaxis_title='Average Production (MW)', showlegend=True,
                       xaxis_title='',  # Remove x-axis title
                       xaxis2_title='',  # Remove x-axis title for subplots
                       xaxis3_title=''  # Remove x-axis title for subplots
@@ -223,7 +232,7 @@ with tab2:
 
     # Customize hover template
     fig.update_traces(
-        hovertemplate='<b>%{fullData.name}</b><br>' + 'Season: %{x}<br>' + 'Production: %{y:.2f} units<extra></extra>')
+        hovertemplate='<b>%{fullData.name}</b><br>' + 'Season: %{x}<br>' + 'Production: %{y:.2f} MW<extra></extra>')
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -242,7 +251,7 @@ with tab3:
     # Customize the legend and lines
     fig.update_layout(legend_title_text='Country', legend_itemsizing='constant', hovermode='x unified',
                       xaxis=dict(tickmode='linear', dtick=1, range=[0, 23]),
-                      yaxis_title='Average Energy Production (units)')
+                      yaxis_title='Average Energy Production (MW)')
 
     # Explicitly set line styles
     fig.update_traces(line=dict(width=3), selector=dict(line_dash='solid')  # Solar gets solid lines
@@ -252,7 +261,7 @@ with tab3:
 
     # Improve hover template
     fig.update_traces(
-        hovertemplate='<b>%{fullData.name}</b><br>' + 'Hour: %{x}:00<br>' + 'Production: %{y:.2f} units<extra></extra>')
+        hovertemplate='<b>%{fullData.name}</b><br>' + 'Hour: %{x}:00<br>' + 'Production: %{y:.2f} MW<extra></extra>')
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -304,7 +313,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                 ax = fig_solar_components.axes[0]
                 ax.set_title("Long-Term Solar Production Trend", pad=20)
                 ax.set_xlabel("Date")
-                ax.set_ylabel("Solar Production (units)")
+                ax.set_ylabel("Solar Production (MW)")
 
                 # Remove the fifth plot
                 if len(fig_solar_components.axes) >= 5:
@@ -315,7 +324,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                 # Show forecast plot with improved visualization
                 st.write("#### Forecast Visualization")
                 fig_solar_forecast = px.line(solar_forecast, x='ds', y='yhat', title='Solar Energy Forecast',
-                                             labels={'ds': 'Date', 'yhat': 'Solar Production (units)'})
+                                             labels={'ds': 'Date', 'yhat': 'Solar Production (MW)'})
 
                 # Add uncertainty range as a shaded area
                 fig_solar_forecast.add_trace(go.Scatter(x=pd.concat([solar_forecast['ds'], solar_forecast['ds'][::-1]]),
@@ -328,7 +337,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
 
                 # Customize layout
                 fig_solar_forecast.update_layout(hovermode='x unified', showlegend=True, xaxis_title='Date',
-                                                 yaxis_title='Solar Production (units)', yaxis=dict(rangemode='tozero'))
+                                                 yaxis_title='Solar Production (MW)', yaxis=dict(rangemode='tozero'))
 
                 # Add range slider for better navigation
                 fig_solar_forecast.update_xaxes(rangeslider_visible=True)
@@ -341,7 +350,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                     <div class="metric-card">
                         <div class="metric-title">Solar Output Range</div>
                         <div class="metric-value">
-                            {last_solar_pred['yhat_lower']:.0f} - {last_solar_pred['yhat_upper']:.0f} units
+                            {last_solar_pred['yhat_lower']:.0f} - {last_solar_pred['yhat_upper']:.0f} MW
                         </div>
                         <div style="color: black;">at {last_solar_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
                         <div class="metric-title">(95% confidence interval)</div>
@@ -374,7 +383,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                 # Show forecast plot with improved visualization
                 st.write("#### Forecast Visualization")
                 fig_wind_forecast = px.line(wind_forecast, x='ds', y='yhat', title='Wind Energy Forecast',
-                                            labels={'ds': 'Date', 'yhat': 'Wind Production (units)'},
+                                            labels={'ds': 'Date', 'yhat': 'Wind Production (MW)'},
                                             color_discrete_sequence=['#4682B4']
                                             # Steel blue color
                                             )
@@ -389,7 +398,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
 
                 # Customize layout
                 fig_wind_forecast.update_layout(hovermode='x unified', showlegend=True, xaxis_title='Date',
-                                                yaxis_title='Wind Production (units)', yaxis=dict(rangemode='tozero'))
+                                                yaxis_title='Wind Production (MW)', yaxis=dict(rangemode='tozero'))
 
                 # Add range slider for better navigation
                 fig_wind_forecast.update_xaxes(rangeslider_visible=True)
@@ -402,7 +411,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                     <div class="metric-card">
                         <div class="metric-title">Wind Output Range</div>
                         <div class="metric-value">
-                            {last_wind_pred['yhat_lower']:.0f} - {last_wind_pred['yhat_upper']:.0f} units
+                            {last_wind_pred['yhat_lower']:.0f} - {last_wind_pred['yhat_upper']:.0f} MW
                         </div>
                         <div style="color: black;">at {last_wind_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
                         <div class="metric-title">(95% confidence interval)</div>
