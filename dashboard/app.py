@@ -1,5 +1,6 @@
 import time
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -342,7 +343,7 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                         <div class="metric-value">
                             {last_solar_pred['yhat_lower']:.0f} - {last_solar_pred['yhat_upper']:.0f} units
                         </div>
-                        <div>at {last_solar_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
+                        <div style="color: black;">at {last_solar_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
                         <div class="metric-title">(95% confidence interval)</div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -403,12 +404,121 @@ if 'Solar' in energy_types or 'Wind Onshore' in energy_types:
                         <div class="metric-value">
                             {last_wind_pred['yhat_lower']:.0f} - {last_wind_pred['yhat_upper']:.0f} units
                         </div>
-                        <div>at {last_wind_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
+                        <div style="color: black;">at {last_wind_pred['ds'].strftime('%Y-%m-%d %H:%M')}</div>
                         <div class="metric-title">(95% confidence interval)</div>
                     </div>
                     """, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Error in wind forecast: {str(e)}")
+
+# --- Interactive Prediction Section ---
+st.subheader("Custom Energy Prediction")
+
+with st.expander("Get a Custom Prediction"):
+    # Create a form to batch all inputs together
+    with st.form(key='prediction_form'):
+        # Create two columns for input layout
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Date and time input
+            pred_date = st.date_input("Select date", value=pd.to_datetime("today"))
+            pred_time = st.time_input("Select time", value=pd.to_datetime("12:00").time())
+            pred_country = st.selectbox("Select country", options=df['Country'].unique())
+
+        with col2:
+            # Weather condition inputs
+            pred_temp = st.number_input("Temperature (°C)", min_value=-20.0, max_value=50.0, value=20.0)
+            pred_rhum = st.number_input("Relative Humidity (%)", min_value=0.0, max_value=100.0, value=50.0)
+            pred_wspd = st.number_input("Wind Speed (m/s)", min_value=0.0, max_value=30.0, value=5.0)
+            energy_type = st.radio("Energy Type", options=['Solar', 'Wind Onshore'])
+
+        # Create prediction button within the form
+        predict_button = st.form_submit_button("Predict Energy Production")
+
+    # Only execute prediction when the button is pressed
+    if predict_button:
+        # Combine date and time
+        pred_datetime = pd.to_datetime(f"{pred_date} {pred_time}")
+
+        # Prepare input dataframe based on selected energy type
+        if energy_type == 'Solar':
+            # Create input features for solar prediction
+            input_features = pd.DataFrame({
+                'ds': [pred_datetime],
+                'temp': [pred_temp],
+                'hour_sin': [np.sin(2 * np.pi * pred_datetime.hour / 24)],
+                'hour_cos': [np.cos(2 * np.pi * pred_datetime.hour / 24)],
+                'month_sin': [np.sin(2 * np.pi * pred_datetime.month / 12)],
+                'month_cos': [np.cos(2 * np.pi * pred_datetime.month / 12)],
+                # Add lag features with default values
+                'Solar_lag_1': [0],
+                'Solar_lag_2': [0],
+                'Solar_lag_3': [0],
+                'Solar_lag_24': [0],
+                'Solar_rolling_24h_mean': [0],
+                'Solar_rolling_24h_std': [0]
+            })
+
+            # Make prediction
+            forecast = solar_model.predict(input_features)
+            prediction = forecast['yhat'].values[0]
+            lower_bound = forecast['yhat_lower'].values[0]
+            upper_bound = forecast['yhat_upper'].values[0]
+
+        else:  # Wind Onshore
+            # Create input features for wind prediction
+            input_features = pd.DataFrame({
+                'ds': [pred_datetime],
+                'wspd': [pred_wspd],
+                'hour_sin': [np.sin(2 * np.pi * pred_datetime.hour / 24)],
+                'hour_cos': [np.cos(2 * np.pi * pred_datetime.hour / 24)],
+                'month_sin': [np.sin(2 * np.pi * pred_datetime.month / 12)],
+                'month_cos': [np.cos(2 * np.pi * pred_datetime.month / 12)],
+                'wind_power_potential': [pred_wspd ** 3],
+                # Add lag features with default values
+                'Wind Onshore_lag_1': [0],
+                'Wind Onshore_lag_2': [0],
+                'Wind Onshore_lag_3': [0],
+                'Wind Onshore_lag_24': [0],
+                'Wind Onshore_rolling_24h_mean': [0],
+                'Wind Onshore_rolling_24h_std': [0]
+            })
+
+            # Make prediction
+            forecast = wind_model.predict(input_features)
+            prediction = forecast['yhat'].values[0]
+            lower_bound = forecast['yhat_lower'].values[0]
+            upper_bound = forecast['yhat_upper'].values[0]
+
+        # Display results
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Predicted {energy_type} Production for {pred_country}</div>
+            <div class="metric-value">{prediction:.0f} MW</div>
+            <div style="color: black;">at {pred_datetime.strftime('%Y-%m-%d %H:%M')}</div>
+            <div class="metric-title">(95% confidence interval: {max(0, lower_bound):.0f} - {upper_bound:.0f} MW)</div>
+            <div class="metric-title">Weather conditions: {pred_temp}°C, {pred_rhum}% RH, {pred_wspd} m/s wind</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Add some interpretation
+        if energy_type == 'Solar':
+            if pred_datetime.hour < 6 or pred_datetime.hour > 18:
+                st.warning("Note: Solar production is typically zero at night")
+            elif prediction < 50:
+                st.info("Low solar production expected due to time of day/weather conditions")
+            else:
+                st.success("Good solar production expected")
+        else:  # Wind
+            if pred_wspd < 3:
+                st.warning("Wind speed below typical operational threshold for turbines")
+            elif pred_wspd > 25:
+                st.error("Wind speed exceeds typical operational limits for turbines")
+            elif prediction < 500:
+                st.info("Moderate wind production expected")
+            else:
+                st.success("Strong wind production expected")
 
 # --- Data Export ---
 st.subheader("Data Export")
