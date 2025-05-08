@@ -12,4 +12,6 @@ fastapi
 flask 
 gunicorn
 meteostat
+statsmodels
 seaborn
+
